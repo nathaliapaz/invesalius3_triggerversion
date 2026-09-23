@@ -68,11 +68,33 @@ class SerialPortConnection(threading.Thread):
             Publisher.sendMessage("Serial port connection", state=False)
 
     def SendPulse(self):
+        """Ask the ESP32 trigger controller to emit one BNC trigger pulse.
+
+        The controller is responsible for electrical pulse width, voltage and
+        isolation. It must not echo this command or send an ``OK`` response on
+        this serial connection, because incoming serial data is reserved for
+        external pulse-event notifications.
+        """
+        if self.connection is None:
+            print("Error: Serial port is not connected.")
+            return False
         try:
-            self.connection.send_break(constants.PULSE_DURATION_IN_MILLISECONDS / 1000)
-            Publisher.sendMessage("Serial port pulse triggered")
+            self.connection.write(constants.ESP32_TRIGGER_COMMAND)
+            self.connection.flush()
+            Publisher.sendMessage("ESP32 trigger command sent")
+            return True
         except Exception:
             print("Error: Serial port could not be written into.")
+            return False
+
+    @staticmethod
+    def _has_pulse_event(lines):
+        """Return True only for the ESP32's explicit post-pulse notification.
+
+        Controller status messages such as ``READY``, ``PONG`` and
+        ``DRY_RUN_TRIGGER`` must not be mistaken for a stimulation event.
+        """
+        return any(line.strip().upper() == b"PULSE" for line in lines)
 
     def run(self):
         if self.connection is None:
@@ -83,7 +105,7 @@ class SerialPortConnection(threading.Thread):
             trigger_on = False
             try:
                 lines = self.connection.readlines()
-                has_data = bool(lines)
+                has_data = self._has_pulse_event(lines)
             except Exception:
                 print("Error: Serial port could not be read.")
                 has_data = False

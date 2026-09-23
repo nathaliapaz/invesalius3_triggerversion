@@ -170,13 +170,13 @@ class InnerFoldPanel(wx.Panel):
         style.SetFirstColour(default_colour)
         style.SetSecondColour(default_colour)
 
+        self.fold_panel = fold_panel
+
         item = fold_panel.AddFoldPanel(_("Coregistration"), collapsed=True)
         ntw = CoregistrationPanel(parent=item, nav_hub=nav_hub)
-        self.fold_panel = fold_panel
         self.__calc_best_size(ntw)
         fold_panel.ApplyCaptionStyle(item, style)
         fold_panel.AddFoldPanelWindow(item, ntw, spacing=0, leftSpacing=0, rightSpacing=0)
-        fold_panel.Expand(fold_panel.GetFoldPanel(0))
 
         self.nav_panel = nav_panel = fold_panel.AddFoldPanel(_("Navigation"), collapsed=True)
         self.__id_nav = nav_panel.GetId()
@@ -185,6 +185,9 @@ class InnerFoldPanel(wx.Panel):
 
         fold_panel.ApplyCaptionStyle(nav_panel, style)
         fold_panel.AddFoldPanelWindow(nav_panel, ntw, spacing=0, leftSpacing=0, rightSpacing=0)
+        # The outer sidebar already opens "Navigation Section" in navigator
+        # mode, so open its only inner panel as well.
+        fold_panel.Expand(nav_panel)
         self.fold_panel.Bind(fpb.EVT_CAPTIONBAR, self.OnFoldPressCaption)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -313,7 +316,7 @@ class InnerFoldPanel(wx.Panel):
         )
 
     def OpenNavigation(self):
-        self.fold_panel.Expand(self.fold_panel.GetFoldPanel(1))
+        self.fold_panel.Expand(self.nav_panel)
 
 
 class CoregistrationPanel(wx.Panel):
@@ -1838,7 +1841,10 @@ class NavigationPanel(wx.Panel):
         main_sizer.AddMany(
             [
                 (top_sizer, 1, wx.EXPAND | wx.GROW),
-                (self.control_panel, 0, wx.EXPAND | wx.TOP, 5),
+                # Share the available height with the controls. Previously the
+                # marker list consumed all extra space and clipped the last row
+                # of navigation buttons.
+                (self.control_panel, 1, wx.EXPAND | wx.TOP, 5),
             ]
         )
         self.sizer = main_sizer
@@ -2183,8 +2189,8 @@ class ControlPanel(wx.Panel):
 
         self.target_selected = False
 
-        scroll_panel_size = wx.Size(-1, 150) if sys.platform != "win32" else wx.Size(-1, 230)
-        scroll_panel = scrolled.ScrolledPanel(self, -1, size=scroll_panel_size)
+        scroll_panel = scrolled.ScrolledPanel(self, -1)
+        scroll_panel.SetMinSize(wx.Size(-1, 150))
         scroll_panel.SetupScrolling(scroll_x=False, scroll_y=True)
         self.scroll_panel = scroll_panel
 
@@ -2206,6 +2212,11 @@ class ControlPanel(wx.Panel):
         self.GREEN_COLOR = GREEN_COLOR
         GREY_COLOR = (217, 217, 217)
         self.GREY_COLOR = GREY_COLOR
+
+        self.automatic_trigger_status = wx.StaticText(
+            scroll_panel, -1, _("Automatic trigger disabled")
+        )
+        self.automatic_trigger_status.SetForegroundColour(self.RED_COLOR)
 
         # Toggle Button for Tractography
         tooltip = _("Control Tractography")
@@ -2289,6 +2300,24 @@ class ControlPanel(wx.Panel):
         self.UpdateToggleButton(show_probe_button, False)  # the probe is hidden at start
         show_probe_button.Bind(wx.EVT_TOGGLEBUTTON, self.OnShowProbe)
         self.show_probe_button = show_probe_button
+
+        # Automatic triggering is an explicit, session-only opt-in.  It is
+        # deliberately shown next to the coil/probe controls because it depends
+        # on the coil position.
+        tooltip = _(
+            "Automatically send one serial trigger after the coil remains at the target for 2 seconds"
+        )
+        automatic_trigger_button = wx.ToggleButton(
+            scroll_panel, -1, "AUTO", style=pbtn.PB_STYLE_SQUARE, size=ICON_SIZE
+        )
+        automatic_trigger_button.SetBackgroundColour(RED_COLOR)
+        automatic_trigger_button.SetValue(False)
+        automatic_trigger_button.SetToolTip(tooltip)
+        automatic_trigger_button.Bind(
+            wx.EVT_TOGGLEBUTTON,
+            partial(self.OnAutomaticTriggerButton, ctrl=automatic_trigger_button),
+        )
+        self.automatic_trigger_button = automatic_trigger_button
 
         # Toggle Button to use serial port to trigger pulse signal and create markers
         tooltip = _("Enable serial port communication to trigger pulse and create markers")
@@ -2378,20 +2407,34 @@ class ControlPanel(wx.Panel):
                 (lock_to_target_button),
                 (show_coil_button),
                 (show_probe_button),
+                (automatic_trigger_button),
                 (show_motor_map_button),
             ]
         )
 
         scroll_sizer = wx.BoxSizer(wx.VERTICAL)
         scroll_sizer.Add(navigation_buttons_sizer, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 10)
+        scroll_sizer.Add(
+            self.automatic_trigger_status,
+            0,
+            wx.ALIGN_CENTER_HORIZONTAL | wx.LEFT | wx.RIGHT | wx.BOTTOM,
+            8,
+        )
         scroll_sizer.Add(self.robots_sizer, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
         scroll_panel.SetSizer(scroll_sizer)
+        # The navigation controls may grow after the scrolled panel is created
+        # (for example, when optional controls are added). Recompute its virtual
+        # size so the final row is fully reachable with the scroll bar.
+        scroll_panel.Layout()
+        scroll_panel.FitInside()
+        scroll_panel.SetupScrolling(scroll_x=False, scroll_y=True)
 
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         main_sizer.AddMany(
             [
                 (start_navigation_button_sizer, 0, wx.EXPAND | wx.ALL, 10),
-                (scroll_panel, 0, wx.EXPAND),
+                # Use all height assigned to ControlPanel before scrolling.
+                (scroll_panel, 1, wx.EXPAND),
             ]
         )
 
@@ -2410,6 +2453,8 @@ class ControlPanel(wx.Panel):
         Publisher.subscribe(self.SetTarget, "Set target")
         Publisher.subscribe(self.UnsetTarget, "Unset target")
         Publisher.subscribe(self.UpdateNavigationStatus, "Navigation status")
+        Publisher.subscribe(self.OnAutomaticTriggerStatus, "Automatic trigger status")
+        Publisher.subscribe(self.OnAutomaticTriggerEnabled, "Automatic trigger enabled")
 
         Publisher.subscribe(self.OnRobotAdded, "Robot added")
 
@@ -2669,6 +2714,22 @@ class ControlPanel(wx.Panel):
         self.UpdateToggleButton(self.show_probe_button)
         pressed = self.show_probe_button.GetValue()
         Publisher.sendMessage("Show probe in viewer volume", state=pressed)
+
+    def OnAutomaticTriggerButton(self, evt, ctrl):
+        self.UpdateToggleButton(ctrl)
+        Publisher.sendMessage("Set automatic trigger", enabled=ctrl.GetValue())
+
+    def OnAutomaticTriggerStatus(self, status):
+        self.automatic_trigger_status.SetLabelText(status)
+        if "pulse sent" in status.lower() or "command sent" in status.lower():
+            self.automatic_trigger_status.SetForegroundColour(self.GREEN_COLOR)
+        elif "enabled" in status.lower() or "hold coil" in status.lower():
+            self.automatic_trigger_status.SetForegroundColour(const.YELLOW_COLOR_RGB)
+        else:
+            self.automatic_trigger_status.SetForegroundColour(self.RED_COLOR)
+
+    def OnAutomaticTriggerEnabled(self, enabled):
+        self.UpdateToggleButton(self.automatic_trigger_button, enabled)
 
     # 'Serial Port Com'
     def OnEnableSerialPort(self, evt, ctrl):

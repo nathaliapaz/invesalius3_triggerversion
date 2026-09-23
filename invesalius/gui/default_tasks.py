@@ -179,8 +179,12 @@ class LowerTaskPanel(wx.Panel):
         image_list.Add(GetExpandedIconBitmap())
         image_list.Add(GetCollapsedIconBitmap())
 
-        # Fold 1 - Data
-        item = fold_panel.AddFoldPanel(_("Data"), collapsed=False, foldIcons=image_list)
+        # Fold 1 - Data. In navigation mode, start collapsed so the navigation
+        # controls receive the available sidebar height. The user can still
+        # expand Data from its caption whenever it is needed.
+        session = ses.Session()
+        data_collapsed = session.GetConfig("mode") == const.MODE_NAVIGATOR
+        item = fold_panel.AddFoldPanel(_("Data"), collapsed=data_collapsed, foldIcons=image_list)
         # style = fold_panel.GetCaptionStyle(item)
         # col = style.GetFirstColour()
         self.enable_items.append(item)
@@ -247,8 +251,16 @@ class LowerTaskPanel(wx.Panel):
             self.SetStateProjectClose()
 
     def SetStateProjectClose(self):
+        session = ses.Session()
+        mode = session.GetConfig("mode")
         for item in self.enable_items:
-            item.Disable()
+            # In navigation mode Data is also the area used to inspect the
+            # navigation context. Keep its caption usable so a collapsed panel
+            # can be expanded, even before a project is opened.
+            if mode == const.MODE_NAVIGATOR:
+                item.Enable()
+            else:
+                item.Disable()
 
     def SetStateProjectOpen(self):
         for item in self.enable_items:

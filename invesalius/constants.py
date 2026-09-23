@@ -1191,7 +1191,17 @@ MOVEMENT_KEYCODES = [
 # Serial port
 BAUD_RATES = [300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200]
 BAUD_RATE_DEFAULT_SELECTION = 4
-PULSE_DURATION_IN_MILLISECONDS = 0.2
+
+# Command sent over USB serial to the ESP32 trigger controller. The ESP32
+# firmware must generate one isolated BNC pulse for each complete command.
+ESP32_TRIGGER_COMMAND = b"TRIGGER\n"
+
+# Automatic TMS triggering is deliberately opt-in.  The coil has to remain at
+# the target for this amount of time before an automatic trigger may be sent.
+AUTOMATIC_TRIGGER_STABILITY_SECONDS = 2.0
+# Require deliberate re-arming after each automatic trigger. Set this to False
+# to retain the previous one-trigger-per-target-acquisition behavior.
+AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE = True
 
 # Robot
 ROBOT_IPS = [

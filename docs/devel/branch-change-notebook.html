@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Caderno de modificações — test-trigger</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 980px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    h1 { margin-bottom: 0; }
+    .meta, .notice { border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+    .meta { background: #e8f1ff; color: #102a43; }
+    .notice { background: #fff4d6; color: #513900; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0 2rem; }
+    th, td { border: 1px solid #aab7c4; padding: .65rem; text-align: left; vertical-align: top; }
+    th { background: #e8eef5; }
+    code { font-family: ui-monospace, Consolas, monospace; }
+    .status { font-weight: 700; color: #137333; }
+    @media (prefers-color-scheme: dark) {
+      .meta { background: #173452; color: #e4f0ff; }
+      .notice { background: #4a3710; color: #fff0c0; }
+      th { background: #263747; }
+      th, td { border-color: #607080; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Caderno de modificações</h1>
+  <p>Registro mantido para a branch <code>test-trigger</code>.</p>
+
+  <section class="meta" aria-label="Metadados do caderno">
+    <strong>Atualizado em:</strong> 22/09/2026<br>
+    <strong>Objetivo atual:</strong> adicionar um trigger automático de TMS quando a bobina permanecer no alvo por 2 segundos, com controle e indicação visual na navegação.
+  </section>
+
+  <h2>Como atualizar</h2>
+  <ol>
+    <li>Adicione uma linha à tabela após cada mudança relevante.</li>
+    <li>Registre o arquivo, o motivo, como foi validado e qualquer risco pendente.</li>
+    <li>Atualize a data acima e salve este arquivo junto com a alteração de código.</li>
+  </ol>
+
+  <h2>Alterações registradas</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Arquivo</th>
+        <th>Modificação</th>
+        <th>Validação / observações</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>invesalius/constants.py</code></td>
+        <td>Adicionada a constante <code>AUTOMATIC_TRIGGER_STABILITY_SECONDS = 2.0</code>.</td>
+        <td>Define o tempo mínimo contínuo no alvo antes do trigger automático.</td>
+      </tr>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>invesalius/navigation/navigation.py</code></td>
+        <td>Implementado o estado do trigger automático, timer de 2 s, pulso único por entrada no alvo e cancelamento ao sair do alvo.</td>
+        <td>Desarma ao interromper a navegação ou desabilitar a porta serial. Permanece desativado por padrão e não é persistido entre sessões.</td>
+      </tr>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>invesalius/gui/task_navigator.py</code></td>
+        <td>Adicionados o botão <code>AUTO</code>, o aviso visual de estado e a atualização da área rolável da navegação.</td>
+        <td>O botão fica próximo aos controles de visualização da bobina e da caneta. A área rolável é recalculada para mostrar o ícone completo.</td>
+      </tr>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>invesalius/gui/task_navigator.py</code></td>
+        <td>Alterado o painel interno aberto inicialmente de <code>Coregistration</code> para <code>Navigation</code>.</td>
+        <td>Evita que a seção externa de navegação apresente inicialmente a aba de importação/coregistro e deixe os controles de navegação ocultos.</td>
+      </tr>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>invesalius/gui/task_navigator.py</code></td>
+        <td>Removido o subpainel <code>Coregistration</code> da seção de navegação.</td>
+        <td>O painel principal de navegação mantém o layout expansível original; somente a área de botões tem rolagem própria.</td>
+      </tr>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>invesalius/gui/task_navigator.py</code></td>
+        <td>Redistribuída a altura da seção de navegação entre a lista de marcadores e os controles.</td>
+        <td>Ambas as áreas agora podem crescer; a área rolável dos botões usa todo o espaço recebido antes de precisar exibir rolagem.</td>
+      </tr>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>invesalius/gui/default_tasks.py</code></td>
+        <td>A seção <code>Data</code> passa a iniciar recolhida no modo de navegação.</td>
+        <td>Libera a altura da barra lateral para a seção <code>Navigation</code>. A seção <code>Data</code> continua disponível pelo seu título.</td>
+      </tr>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>invesalius/gui/default_tasks.py</code></td>
+        <td>O título de <code>Data</code> permanece habilitado no modo de navegação, mesmo sem projeto aberto.</td>
+        <td>Permite expandir novamente a seção recolhida pelo botão/título da própria seção.</td>
+      </tr>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>invesalius/gui/task_navigator.py</code></td>
+        <td>Restaurado o subpainel <code>Coregistration</code> na seção de navegação.</td>
+        <td><code>Navigation</code> continua sendo o subpainel aberto inicialmente; <code>Coregistration</code> pode ser aberto pelo seu título.</td>
+      </tr>
+      <tr>
+        <td>22/09/2026</td>
+        <td><code>invesalius/data/serial_port_connection.py</code>, <code>invesalius/constants.py</code></td>
+        <td>A saída de trigger deixou de usar <code>send_break()</code> e passa a enviar <code>TRIGGER\n</code> pela porta USB serial ao ESP32.</td>
+        <td>O ESP32 deve gerar um único pulso BNC isolado por comando e não deve enviar eco/confirmação nessa mesma porta serial.</td>
+      </tr>
+      <tr>
+        <td>22/09/2026</td>
+        <td><code>tests/test_esp32_trigger.py</code></td>
+        <td>Adicionados testes do comando USB ao ESP32 e da falha segura quando não há conexão serial.</td>
+        <td class="status">5 testes aprovados: timer automático e protocolo ESP32.</td>
+      </tr>
+      <tr>
+        <td>22/09/2026</td>
+        <td><code>firmware/esp32_trigger_controller/</code></td>
+        <td>Criado projeto PlatformIO do controlador ESP32 e protocolo USB serial <code>TRIGGER</code>.</td>
+        <td>O firmware inicia em modo de simulação: não altera GPIO nem produz sinal BNC até que a interface elétrica seja validada.</td>
+      </tr>
+      <tr>
+        <td>22/09/2026</td>
+        <td><code>invesalius/data/serial_port_connection.py</code></td>
+        <td>A entrada serial passa a considerar somente a mensagem <code>PULSE</code> do ESP32 como evento de estimulação.</td>
+        <td>Mensagens de diagnóstico do controlador, como <code>READY</code> e <code>DRY_RUN_TRIGGER</code>, não geram marcadores de pulso.</td>
+      </tr>
+      <tr>
+        <td>22/09/2026</td>
+        <td><code>firmware/esp32_trigger_controller/platformio.ini</code></td>
+        <td>Configurado o pino <code>D13</code> (GPIO 13 no ESP32 DevKit V1 comum) como saída de trigger planejada.</td>
+        <td>A saída BNC continua desabilitada no firmware até a validação elétrica e de isolamento.</td>
+      </tr>
+      <tr>
+        <td>22/09/2026</td>
+        <td><code>firmware/esp32_trigger_controller/platformio.ini</code></td>
+        <td>Configurada a porta de gravação <code>COM9</code> para o ESP32 conectado a este computador.</td>
+        <td>O comando <em>Upload</em> do PlatformIO pode usar essa porta automaticamente enquanto o dispositivo permanecer nela.</td>
+      </tr>
+      <tr>
+        <td>22/09/2026</td>
+        <td><code>firmware/esp32_trigger_controller/platformio.ini</code></td>
+        <td>Configurado o monitor serial na <code>COM9</code>, a 115200 baud, com eco local e final de linha <code>LF</code>.</td>
+        <td>Os comandos digitados no monitor ficam visíveis durante os testes do firmware.</td>
+      </tr>
+      <tr>
+        <td>22/09/2026</td>
+        <td><code>firmware/esp32_trigger_controller/platformio.ini</code></td>
+        <td>Habilitada a saída de teste: todo comando <code>TRIGGER</code> produz pulso ativo alto de 1 ms no D13/GPIO13.</td>
+        <td>O nível alto do GPIO é nominalmente 3,3 V. Ao receber o comando, o firmware responde <code>PULSE</code>.</td>
+      </tr>
+      <tr>
+        <td>22/09/2026</td>
+        <td><code>invesalius/navigation/navigation.py</code>, <code>invesalius/constants.py</code></td>
+        <td>Após um comando automático enviado com sucesso, o botão AUTO é desativado e exige novo acionamento manual antes de outro disparo.</td>
+        <td>A política pode ser desabilitada centralmente com <code>AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE = False</code>, sem alterar a lógica de tempo ou comunicação serial. <span class="status">6 testes aprovados.</span></td>
+      </tr>
+      <tr>
+        <td>18/09/2026</td>
+        <td><code>tests/test_automatic_trigger.py</code></td>
+        <td>Adicionados testes para disparo único após estabilidade e cancelamento ao sair do alvo.</td>
+        <td class="status">2 testes aprovados com <code>uv run pytest tests/test_automatic_trigger.py</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Estado operacional atual do trigger</h2>
+  <section class="notice" aria-label="Resumo operacional atual">
+    <strong>Versão descrita:</strong> código do InVesalius e firmware ESP32 após as alterações de 22/09/2026.<br>
+    <strong>Importante:</strong> esta seção descreve o que o software faz. A mensagem <code>PULSE</code> confirma que o ESP32 terminou o pulso no GPIO; ela não confirma, por si só, que o Magstim recebeu ou aplicou uma estimulação.
+  </section>
+
+  <h3>1. Configuração e estado inicial</h3>
+  <ul>
+    <li>O ESP32 DevKit V1 é usado pela USB na porta <code>COM9</code>, a <code>115200</code> baud.</li>
+    <li>No InVesalius, a porta serial é selecionada pelo botão de comunicação serial na seção <code>Navigation</code>, antes de iniciar a navegação. A velocidade é definida pelo código como 115200.</li>
+    <li>O AUTO começa desativado e não é salvo entre sessões. É necessário habilitá-lo explicitamente pelo botão <code>AUTO</code>.</li>
+    <li>O Monitor do PlatformIO e o InVesalius não devem permanecer abertos na <code>COM9</code> ao mesmo tempo.</li>
+  </ul>
+
+  <h3>2. Disparo automático no InVesalius</h3>
+  <ol>
+    <li>Com a navegação iniciada, comunicação serial ativa e AUTO habilitado, o InVesalius recebe o estado <code>Coil at target</code>.</li>
+    <li>Na transição de fora do alvo para no alvo, ele agenda um temporizador de <code>2,0 s</code> (<code>AUTOMATIC_TRIGGER_STABILITY_SECONDS</code>).</li>
+    <li>Se a bobina sair do alvo antes do prazo, se o AUTO for desativado, se a porta serial for desativada ou se a navegação for encerrada, o temporizador é cancelado e nenhum comando automático é enviado.</li>
+    <li>Ao completar 2 s continuamente no alvo, o InVesalius confirma que a porta serial está conectada e envia exatamente <code>TRIGGER\n</code> pela USB.</li>
+    <li>Se a escrita serial falhar, o estado AUTO permanece ligado e a interface informa que o comando não pôde ser enviado.</li>
+    <li>Se a escrita serial for bem-sucedida, o InVesalius registra que já houve um disparo naquela aquisição e desliga o AUTO. O botão precisa ser pressionado novamente para rearmar outro disparo automático.</li>
+  </ol>
+  <p>Esse último comportamento é controlado por <code>AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE = True</code>. Para manter o AUTO ligado após um disparo, alterar somente essa constante para <code>False</code>.</p>
+
+  <h3>3. Acionamento manual pelo pedal</h3>
+  <p>O pedal permanece independente do AUTO e da espera de 2 s. Quando a comunicação serial está ativa e a regra de permissão do pedal é satisfeita, ele chama o mesmo envio <code>TRIGGER\n</code> imediatamente.</p>
+
+  <h3>4. Firmware atualmente gravado/compilado para o ESP32</h3>
+  <ul>
+    <li><code>ENABLE_BNC_OUTPUT=1</code>: o ramo que altera o GPIO está habilitado pela opção de compilação do <code>platformio.ini</code>.</li>
+    <li><code>TRIGGER_PIN=13</code>: a saída é o pino rotulado <code>D13</code> na placa, correspondente ao GPIO13 no DevKit V1 comum.</li>
+    <li><code>TRIGGER_ACTIVE_HIGH=1</code>: o pulso vai do nível inativo baixo para o nível alto e volta a baixo.</li>
+    <li><code>PULSE_WIDTH_US=1000</code>: o nível alto permanece por 1000 microssegundos, ou 1 ms.</li>
+    <li>O nível alto do GPIO é nominalmente 3,3 V; o firmware não cria uma fonte regulada de 3,6 V ou 5,5 V.</li>
+  </ul>
+
+  <h3>5. Protocolo USB serial e respostas do ESP32</h3>
+  <p>O firmware inicia a serial em 115200 baud, mostra <code>READY</code> ao iniciar e monta comandos até receber fim de linha. Os comandos são removidos de espaços e convertidos para maiúsculas.</p>
+  <table>
+    <thead><tr><th>Entrada USB</th><th>Ação do ESP32</th><th>Resposta USB</th></tr></thead>
+    <tbody>
+      <tr><td><code>PING</code></td><td>Teste de comunicação.</td><td><code>PONG</code></td></tr>
+      <tr><td><code>STATUS</code></td><td>Consulta o modo de saída compilado.</td><td><code>OUTPUT_ENABLED</code></td></tr>
+      <tr><td><code>TRIGGER</code></td><td>D13 alto por 1 ms e, em seguida, baixo.</td><td><code>PULSE</code></td></tr>
+      <tr><td>Outro comando não vazio</td><td>Nenhum pulso é produzido.</td><td><code>UNKNOWN_COMMAND</code></td></tr>
+    </tbody>
+  </table>
+  <p>O InVesalius trata somente a linha exata <code>PULSE</code> como evento de pulso recebido. Mensagens como <code>READY</code>, <code>PONG</code> e <code>OUTPUT_ENABLED</code> não são registradas como pulsos.</p>
+
+  <h3>6. Limite entre software e conexão física</h3>
+  <p>O software controla apenas D13 e GND do ESP32. A tensão efetiva no conector BNC, a polaridade, a referência elétrica e a compatibilidade com a entrada do módulo Magstim dependem inteiramente da montagem física e das especificações do equipamento; elas não são verificadas pelo InVesalius nem pelo firmware.</p>
+
+  <h2>Pendências e segurança</h2>
+  <ul>
+    <li>O cabo/interface para o Magstim ainda não foi definido ou testado.</li>
+    <li>O caminho serial existente usa <code>SendPulse()</code>; a compatibilidade elétrica depende da interface isolada apropriada.</li>
+    <li>Antes de uso com equipamento real, validar a pinagem, os níveis elétricos, o isolamento e o comportamento do pulso em bancada.</li>
+  </ul>
+
+  <section class="notice" aria-label="Alteração não atribuída">
+    <strong>Nota:</strong> <code>uv.lock</code> aparece modificado no estado atual do Git, mas essa alteração já existia antes deste trabalho e não foi incluída neste registro.
+  </section>
+</body>
+</html>

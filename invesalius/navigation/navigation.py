@@ -407,6 +407,9 @@ class Navigation(metaclass=Singleton):
         # During navigation
         self.lock_to_target = False
         self.coil_at_target = False
+        self.automatic_trigger_enabled = False
+        self._automatic_trigger_timer = None
+        self._automatic_trigger_fired = False
 
         self.LoadConfig()
 
@@ -417,6 +420,7 @@ class Navigation(metaclass=Singleton):
         Publisher.subscribe(self.SetNoOfCoils, "Reset coil selection")
         Publisher.subscribe(self.SelectCoil, "Select coil")
         Publisher.subscribe(self.UpdateSerialPort, "Update serial port")
+        Publisher.subscribe(self.SetAutomaticTriggerEnabled, "Set automatic trigger")
         Publisher.subscribe(self.TrackObject, "Track object")
 
     def SaveConfig(self, key=None, value=None):
@@ -488,7 +492,99 @@ class Navigation(metaclass=Singleton):
         self.SaveConfig()
 
     def CoilAtTarget(self, state):
+        state = bool(state)
+        was_at_target = self.coil_at_target
         self.coil_at_target = state
+
+        if not state:
+            self._reset_automatic_trigger()
+            return
+
+        if self.automatic_trigger_enabled and not was_at_target:
+            self._schedule_automatic_trigger()
+
+    def SetAutomaticTriggerEnabled(self, enabled=False):
+        """Enable or disable one automatic trigger per stable target acquisition.
+
+        This setting intentionally is not persisted: automatic stimulation must
+        always be explicitly enabled for the current application session.
+        """
+        self.automatic_trigger_enabled = bool(enabled)
+        self._reset_automatic_trigger(send_status=False)
+        Publisher.sendMessage("Automatic trigger enabled", enabled=self.automatic_trigger_enabled)
+
+        if self.automatic_trigger_enabled:
+            Publisher.sendMessage(
+                "Automatic trigger status", status=_("Automatic trigger enabled")
+            )
+            if self.coil_at_target:
+                self._schedule_automatic_trigger()
+        else:
+            Publisher.sendMessage(
+                "Automatic trigger status", status=_("Automatic trigger disabled")
+            )
+
+    def _reset_automatic_trigger(self, send_status=True):
+        if self._automatic_trigger_timer is not None:
+            self._automatic_trigger_timer.Stop()
+            self._automatic_trigger_timer = None
+        self._automatic_trigger_fired = False
+        if send_status and self.automatic_trigger_enabled:
+            Publisher.sendMessage(
+                "Automatic trigger status", status=_("Automatic trigger: waiting for coil at target")
+            )
+
+    def _schedule_automatic_trigger(self):
+        if self._automatic_trigger_fired or self._automatic_trigger_timer is not None:
+            return
+
+        Publisher.sendMessage(
+            "Automatic trigger status",
+            status=_("Automatic trigger: hold coil at target for 2 seconds"),
+        )
+        self._automatic_trigger_timer = wx.CallLater(
+            int(const.AUTOMATIC_TRIGGER_STABILITY_SECONDS * 1000),
+            self._fire_automatic_trigger,
+        )
+
+    def _fire_automatic_trigger(self):
+        self._automatic_trigger_timer = None
+        if not self.automatic_trigger_enabled or not self.coil_at_target:
+            return
+
+        if not self.serial_port_in_use or self.serial_port_connection is None:
+            Publisher.sendMessage(
+                "Automatic trigger status", status=_("Automatic trigger: serial port is not connected")
+            )
+            return
+
+        if not self.serial_port_connection.SendPulse():
+            Publisher.sendMessage(
+                "Automatic trigger status", status=_("Automatic trigger: command could not be sent")
+            )
+            return
+        self._automatic_trigger_fired = True
+        Publisher.sendMessage(
+            "Automatic trigger status", status=_("Automatic trigger: command sent to ESP32")
+        )
+        self._disable_automatic_trigger_after_fire()
+
+    def _disable_automatic_trigger_after_fire(self):
+        """Disarm AUTO after a successful trigger when that policy is enabled.
+
+        Keep the policy in one method so it can be disabled centrally through
+        ``AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE`` without changing the trigger
+        timing or serial-command logic.
+        """
+        if not const.AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE:
+            return
+
+        self.automatic_trigger_enabled = False
+        Publisher.sendMessage("Automatic trigger enabled", enabled=False)
+        Publisher.sendMessage(
+            "Automatic trigger status",
+            status=_("Automatic trigger: command sent to ESP32; AUTO disabled"),
+        )
 
     def UpdateNavSleep(self, sleep):
         self.sleep_nav = sleep
@@ -498,6 +594,8 @@ class Navigation(metaclass=Singleton):
         self.serial_port_in_use = serial_port_in_use
         self.com_port = com_port
         self.baud_rate = baud_rate
+        if not serial_port_in_use:
+            self.SetAutomaticTriggerEnabled(False)
 
     def TrackObject(self, enabled=False):
         self.track_coil = enabled
@@ -597,6 +695,10 @@ class Navigation(metaclass=Singleton):
     def StartNavigation(self, tracker, icp):
         # initialize jobs list
         jobs_list = []
+
+        # A previous navigation session must never leave a pending timer behind.
+        self.coil_at_target = False
+        self._reset_automatic_trigger()
 
         if self.event.is_set():
             self.event.clear()
@@ -704,6 +806,7 @@ class Navigation(metaclass=Singleton):
                         "InVesalius 3",
                     )
                     self.serial_port_in_use = False
+                    self.SetAutomaticTriggerEnabled(False)
 
             if self.view_tracts:
                 # initialize Trekker parameters
@@ -765,6 +868,9 @@ class Navigation(metaclass=Singleton):
             self.pedal_connector.add_callback("navigation", self.PedalStateChanged)
 
     def StopNavigation(self):
+        # Disarm automatic stimulation before stopping any worker threads.
+        self.coil_at_target = False
+        self.SetAutomaticTriggerEnabled(False)
         self.event.set()
 
         self.pedal_connector.remove_callback("navigation")
