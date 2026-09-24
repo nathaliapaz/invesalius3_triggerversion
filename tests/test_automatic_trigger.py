@@ -9,18 +9,20 @@ def make_navigation():
     navigation.coil_at_target = False
     navigation.automatic_trigger_enabled = True
     navigation._automatic_trigger_timer = None
+    navigation._automatic_trigger_cooldown_timer = None
     navigation._automatic_trigger_fired = False
     navigation.serial_port_in_use = True
     navigation.serial_port_connection = MagicMock()
     return navigation
 
 
-def test_automatic_trigger_fires_once_after_stable_target(mocker):
+def test_automatic_trigger_starts_random_cooldown_after_stable_target(mocker):
     navigation = make_navigation()
     timer = MagicMock()
     call_later = mocker.patch(
         "invesalius.navigation.navigation.wx.CallLater", return_value=timer
     )
+    mocker.patch("invesalius.navigation.navigation.random.uniform", return_value=5.0)
     mocker.patch("invesalius.navigation.navigation.Publisher.sendMessage")
 
     Navigation.CoilAtTarget(navigation, True)
@@ -31,19 +33,24 @@ def test_automatic_trigger_fires_once_after_stable_target(mocker):
 
     navigation.serial_port_connection.SendPulse.assert_called_once_with()
     assert navigation._automatic_trigger_fired is True
-    assert navigation.automatic_trigger_enabled is False
+    assert navigation.automatic_trigger_enabled is True
+    call_later.assert_called_with(
+        5000, navigation._complete_automatic_trigger_cooldown
+    )
 
 
-def test_auto_can_remain_enabled_after_fire_when_policy_is_disabled(mocker):
+def test_cooldown_completion_requires_a_new_stable_target_check(mocker):
     navigation = make_navigation()
     navigation.coil_at_target = True
+    navigation._automatic_trigger_fired = True
+    navigation._automatic_trigger_cooldown_timer = MagicMock()
     mocker.patch("invesalius.navigation.navigation.Publisher.sendMessage")
-    mocker.patch("invesalius.navigation.navigation.const.AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE", False)
+    call_later = mocker.patch("invesalius.navigation.navigation.wx.CallLater")
 
-    Navigation._fire_automatic_trigger(navigation)
+    Navigation._complete_automatic_trigger_cooldown(navigation)
 
-    navigation.serial_port_connection.SendPulse.assert_called_once_with()
-    assert navigation.automatic_trigger_enabled is True
+    assert navigation._automatic_trigger_fired is False
+    call_later.assert_called_once_with(2000, navigation._fire_automatic_trigger)
 
 
 def test_leaving_target_cancels_pending_automatic_trigger(mocker):
@@ -58,3 +65,16 @@ def test_leaving_target_cancels_pending_automatic_trigger(mocker):
     timer.Stop.assert_called_once_with()
     assert navigation._automatic_trigger_timer is None
     assert navigation._automatic_trigger_fired is False
+
+
+def test_leaving_target_does_not_cancel_post_trigger_cooldown(mocker):
+    navigation = make_navigation()
+    cooldown_timer = MagicMock()
+    navigation._automatic_trigger_fired = True
+    navigation._automatic_trigger_cooldown_timer = cooldown_timer
+    mocker.patch("invesalius.navigation.navigation.Publisher.sendMessage")
+
+    Navigation.CoilAtTarget(navigation, False)
+
+    cooldown_timer.Stop.assert_not_called()
+    assert navigation._automatic_trigger_cooldown_timer is cooldown_timer

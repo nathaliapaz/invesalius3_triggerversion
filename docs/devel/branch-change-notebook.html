@@ -29,8 +29,8 @@
   <p>Registro mantido para a branch <code>test-trigger</code>.</p>
 
   <section class="meta" aria-label="Metadados do caderno">
-    <strong>Atualizado em:</strong> 22/09/2026<br>
-    <strong>Objetivo atual:</strong> adicionar um trigger automático de TMS quando a bobina permanecer no alvo por 2 segundos, com controle e indicação visual na navegação.
+    <strong>Atualizado em:</strong> 24/09/2026<br>
+    <strong>Objetivo atual:</strong> adicionar um trigger automático de TMS quando a bobina permanecer no alvo por 2 segundos, com controle e indicação visual na navegação, e preparar a futura comunicação serial remota com o Magstim.
   </section>
 
   <h2>Como atualizar</h2>
@@ -51,6 +51,30 @@
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td>24/09/2026</td>
+        <td>Planejamento de hardware e protocolo (sem alteração de código)</td>
+        <td>Definida a arquitetura pretendida para substituir o trigger BNC: <code>InVesalius → ESP32 → MAX3232 → DB26 macho → Magstim</code>. O ESP32 fará a ponte entre o computador e a UART RS-232 do Magstim; o MAX3232 adapta os níveis TTL de 3,3 V aos níveis RS-232.</td>
+        <td>O protocolo será implementado de forma independente, tomando o MagPy apenas como referência comportamental. Não copiar código do MagPy para o InVesalius: as licenças GPLv2 do InVesalius e GPLv3 do MagPy exigem avaliação antes de combinar código.</td>
+      </tr>
+      <tr>
+        <td>24/09/2026</td>
+        <td>Planejamento de alimentação (sem alteração de código)</td>
+        <td>Decidido manter o ESP32 alimentado de forma independente pelo USB ou por uma fonte externa regulada de 5 V no pino <code>VIN/5V</code> da placa DevKit. O pino <code>3V3</code> não recebe 5 V.</td>
+        <td>Não usar um pino de sinal ou de terra do DB26 como fonte de alimentação. A disponibilidade, tensão, corrente e isolamento de qualquer alimentação vinda do Magstim devem ser confirmados no manual antes de qualquer ligação.</td>
+      </tr>
+      <tr>
+        <td>24/09/2026</td>
+        <td>Planejamento de pinagem (sem alteração de código)</td>
+        <td>Mapeamento conceitual da ponte: ESP32 TX → entrada TTL do MAX3232 → saída RS-232 para RXD do Magstim; TXD do Magstim → entrada RS-232 do MAX3232 → RX do ESP32.</td>
+        <td>A escolha do pino de terra serial no DB26 permanece pendente de confirmação no manual do modelo/adaptador. Há referências distintas para as configurações de conector; não soldar com base apenas em continuidade elétrica entre os pinos de terra.</td>
+      </tr>
+      <tr>
+        <td>24/09/2026</td>
+        <td><code>invesalius/constants.py</code>, <code>invesalius/navigation/navigation.py</code>, <code>tests/test_automatic_trigger.py</code></td>
+        <td>O AUTO deixa de ser desativado após um disparo bem-sucedido. Ele inicia uma pausa aleatória de 4 a 6 s e, ao fim dela, exige novamente 2 s contínuos de <code>Coil at target</code> antes de enviar outro comando.</td>
+        <td>Com a bobina continuamente no alvo, o intervalo entre comandos <code>TRIGGER</code> é aleatório entre 6 e 8 s. Sair do alvo cancela apenas a verificação de estabilidade em andamento; não encurta uma pausa já iniciada após disparo.</td>
+      </tr>
       <tr>
         <td>18/09/2026</td>
         <td><code>invesalius/constants.py</code></td>
@@ -160,6 +184,12 @@
         <td>A política pode ser desabilitada centralmente com <code>AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE = False</code>, sem alterar a lógica de tempo ou comunicação serial. <span class="status">6 testes aprovados.</span></td>
       </tr>
       <tr>
+        <td>23/09/2026</td>
+        <td><code>firmware/esp32_trigger_controller/src/main.cpp</code></td>
+        <td>Corrigido o comentário sobre o modo dry-run para refletir que a saída é definida pelos parâmetros de compilação do <code>platformio.ini</code>.</td>
+        <td>Com <code>ENABLE_BNC_OUTPUT=1</code>, o firmware atual gera o pulso no D13; a alteração é somente documental.</td>
+      </tr>
+      <tr>
         <td>18/09/2026</td>
         <td><code>tests/test_automatic_trigger.py</code></td>
         <td>Adicionados testes para disparo único após estabilidade e cancelamento ao sair do alvo.</td>
@@ -173,6 +203,15 @@
     <strong>Versão descrita:</strong> código do InVesalius e firmware ESP32 após as alterações de 22/09/2026.<br>
     <strong>Importante:</strong> esta seção descreve o que o software faz. A mensagem <code>PULSE</code> confirma que o ESP32 terminou o pulso no GPIO; ela não confirma, por si só, que o Magstim recebeu ou aplicou uma estimulação.
   </section>
+
+  <h3>Próxima arquitetura planejada: comunicação serial remota</h3>
+  <p>A implementação atual ainda usa o comando <code>TRIGGER</code> para gerar um pulso BNC no D13. A próxima etapa ainda <strong>não foi implementada</strong>: ela substituirá esse caminho por uma ponte serial bidirecional entre o InVesalius e o Magstim.</p>
+  <pre>InVesalius -- USB ou rede --&gt; ESP32 -- UART TTL 3,3 V --&gt; MAX3232 -- RS-232/DB26 --&gt; Magstim</pre>
+  <ul>
+    <li>O ESP32 não deve ser ligado diretamente aos pinos RXD/TXD do DB26: o MAX3232 (ou, preferencialmente, uma interface RS-232 isolada compatível) é necessário para adaptar tensão e polaridade.</li>
+    <li>O ESP32 continuará alimentado por USB ou por 5 V regulados em <code>VIN/5V</code>; não pelo DB26 do Magstim sem especificação explícita do fabricante.</li>
+    <li>Antes de habilitar comandos de armar ou disparar, a ponte deve ser testada inicialmente apenas com consultas de estado e parâmetros.</li>
+  </ul>
 
   <h3>1. Configuração e estado inicial</h3>
   <ul>
@@ -189,9 +228,11 @@
     <li>Se a bobina sair do alvo antes do prazo, se o AUTO for desativado, se a porta serial for desativada ou se a navegação for encerrada, o temporizador é cancelado e nenhum comando automático é enviado.</li>
     <li>Ao completar 2 s continuamente no alvo, o InVesalius confirma que a porta serial está conectada e envia exatamente <code>TRIGGER\n</code> pela USB.</li>
     <li>Se a escrita serial falhar, o estado AUTO permanece ligado e a interface informa que o comando não pôde ser enviado.</li>
-    <li>Se a escrita serial for bem-sucedida, o InVesalius registra que já houve um disparo naquela aquisição e desliga o AUTO. O botão precisa ser pressionado novamente para rearmar outro disparo automático.</li>
+    <li>Se a escrita serial for bem-sucedida, o AUTO permanece habilitado e inicia uma pausa aleatória de 4,0 a 6,0 s.</li>
+    <li>Ao fim da pausa, se a bobina ainda estiver no alvo, uma nova verificação contínua de 2,0 s é iniciada. Portanto, com a bobina continuamente no alvo, o intervalo entre comandos enviados é de 6,0 a 8,0 s.</li>
+    <li>Se a bobina sair do alvo durante os 2 s de verificação, essa verificação é cancelada. Se ela sair durante a pausa pós-disparo, a pausa continua até terminar, mas a próxima verificação só começa quando ela voltar ao alvo.</li>
   </ol>
-  <p>Esse último comportamento é controlado por <code>AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE = True</code>. Para manter o AUTO ligado após um disparo, alterar somente essa constante para <code>False</code>.</p>
+  <p>Os limites da pausa são centralizados em <code>AUTOMATIC_TRIGGER_COOLDOWN_MIN_SECONDS = 4.0</code> e <code>AUTOMATIC_TRIGGER_COOLDOWN_MAX_SECONDS = 6.0</code>. A opção <code>AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE = False</code> mantém o AUTO ativo; ela pode ser definida como <code>True</code> caso se queira restaurar o rearmamento manual após cada disparo.</p>
 
   <h3>3. Acionamento manual pelo pedal</h3>
   <p>O pedal permanece independente do AUTO e da espera de 2 s. Quando a comunicação serial está ativa e a regra de permissão do pedal é satisfeita, ele chama o mesmo envio <code>TRIGGER\n</code> imediatamente.</p>

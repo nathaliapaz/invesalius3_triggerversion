@@ -18,6 +18,7 @@
 # --------------------------------------------------------------------------
 
 import queue
+import random
 import threading
 import time
 from time import sleep
@@ -409,6 +410,7 @@ class Navigation(metaclass=Singleton):
         self.coil_at_target = False
         self.automatic_trigger_enabled = False
         self._automatic_trigger_timer = None
+        self._automatic_trigger_cooldown_timer = None
         self._automatic_trigger_fired = False
 
         self.LoadConfig()
@@ -497,7 +499,14 @@ class Navigation(metaclass=Singleton):
         self.coil_at_target = state
 
         if not state:
-            self._reset_automatic_trigger()
+            # Leaving the target cancels only the current 2-second stability
+            # measurement. A cooldown already started by a sent trigger keeps
+            # running, preserving the minimum interval between commands.
+            self._cancel_automatic_trigger_stability_timer()
+            if self.automatic_trigger_enabled and self._automatic_trigger_cooldown_timer is None:
+                Publisher.sendMessage(
+                    "Automatic trigger status", status=_("Automatic trigger: waiting for coil at target")
+                )
             return
 
         if self.automatic_trigger_enabled and not was_at_target:
@@ -525,17 +534,27 @@ class Navigation(metaclass=Singleton):
             )
 
     def _reset_automatic_trigger(self, send_status=True):
-        if self._automatic_trigger_timer is not None:
-            self._automatic_trigger_timer.Stop()
-            self._automatic_trigger_timer = None
+        self._cancel_automatic_trigger_stability_timer()
+        if self._automatic_trigger_cooldown_timer is not None:
+            self._automatic_trigger_cooldown_timer.Stop()
+            self._automatic_trigger_cooldown_timer = None
         self._automatic_trigger_fired = False
         if send_status and self.automatic_trigger_enabled:
             Publisher.sendMessage(
                 "Automatic trigger status", status=_("Automatic trigger: waiting for coil at target")
             )
 
+    def _cancel_automatic_trigger_stability_timer(self):
+        if self._automatic_trigger_timer is not None:
+            self._automatic_trigger_timer.Stop()
+            self._automatic_trigger_timer = None
+
     def _schedule_automatic_trigger(self):
-        if self._automatic_trigger_fired or self._automatic_trigger_timer is not None:
+        if (
+            self._automatic_trigger_fired
+            or self._automatic_trigger_timer is not None
+            or self._automatic_trigger_cooldown_timer is not None
+        ):
             return
 
         Publisher.sendMessage(
@@ -567,7 +586,40 @@ class Navigation(metaclass=Singleton):
         Publisher.sendMessage(
             "Automatic trigger status", status=_("Automatic trigger: command sent to ESP32")
         )
-        self._disable_automatic_trigger_after_fire()
+        if const.AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE:
+            self._disable_automatic_trigger_after_fire()
+        else:
+            self._start_automatic_trigger_cooldown()
+
+    def _start_automatic_trigger_cooldown(self):
+        """Pause AUTO for a randomized interval before a new 2-second check."""
+        cooldown_seconds = random.uniform(
+            const.AUTOMATIC_TRIGGER_COOLDOWN_MIN_SECONDS,
+            const.AUTOMATIC_TRIGGER_COOLDOWN_MAX_SECONDS,
+        )
+        Publisher.sendMessage(
+            "Automatic trigger status",
+            status=_(
+                "Automatic trigger: waiting {:.1f} seconds before next target check"
+            ).format(cooldown_seconds),
+        )
+        self._automatic_trigger_cooldown_timer = wx.CallLater(
+            int(cooldown_seconds * 1000), self._complete_automatic_trigger_cooldown
+        )
+
+    def _complete_automatic_trigger_cooldown(self):
+        self._automatic_trigger_cooldown_timer = None
+        self._automatic_trigger_fired = False
+
+        if not self.automatic_trigger_enabled:
+            return
+
+        if self.coil_at_target:
+            self._schedule_automatic_trigger()
+        else:
+            Publisher.sendMessage(
+                "Automatic trigger status", status=_("Automatic trigger: waiting for coil at target")
+            )
 
     def _disable_automatic_trigger_after_fire(self):
         """Disarm AUTO after a successful trigger when that policy is enabled.

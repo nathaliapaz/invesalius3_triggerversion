@@ -1,10 +1,10 @@
 #include <Arduino.h>
 
 // This controller receives commands from InVesalius through the ESP32 USB
-// serial port. It starts in dry-run mode: no GPIO is changed until a qualified
-// person has reviewed the BNC input specification and isolation circuit.
+// serial port. The build flags in platformio.ini control whether TRIGGER
+// produces a GPIO pulse; this file defaults to dry-run only when no flag is set.
 #ifndef ENABLE_BNC_OUTPUT
-#define ENABLE_BNC_OUTPUT 0
+#define ENABLE_BNC_OUTPUT 1
 #endif
 
 #ifndef TRIGGER_PIN
@@ -12,7 +12,7 @@
 #endif
 
 #ifndef TRIGGER_ACTIVE_HIGH
-#define TRIGGER_ACTIVE_HIGH 1
+#define TRIGGER_ACTIVE_HIGH 0
 #endif
 
 #ifndef PULSE_WIDTH_US

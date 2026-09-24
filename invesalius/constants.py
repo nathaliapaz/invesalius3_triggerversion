@@ -1199,9 +1199,16 @@ ESP32_TRIGGER_COMMAND = b"TRIGGER\n"
 # Automatic TMS triggering is deliberately opt-in.  The coil has to remain at
 # the target for this amount of time before an automatic trigger may be sent.
 AUTOMATIC_TRIGGER_STABILITY_SECONDS = 2.0
-# Require deliberate re-arming after each automatic trigger. Set this to False
-# to retain the previous one-trigger-per-target-acquisition behavior.
-AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE = True
+# Keep AUTO enabled after a successful automatic trigger. Set this to True only
+# when deliberate re-arming after every trigger is required.
+AUTOMATIC_TRIGGER_DISABLE_AFTER_FIRE = False
+
+# After a successful automatic trigger, wait a randomized cooldown before
+# starting another continuous coil-at-target stability measurement. Together
+# with AUTOMATIC_TRIGGER_STABILITY_SECONDS, this produces a 6--8 s interval
+# between commands while the coil remains continuously at the target.
+AUTOMATIC_TRIGGER_COOLDOWN_MIN_SECONDS = 4.0
+AUTOMATIC_TRIGGER_COOLDOWN_MAX_SECONDS = 6.0
 
 # Robot
 ROBOT_IPS = [
