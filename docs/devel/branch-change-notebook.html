@@ -76,6 +76,12 @@
         <td>Com a bobina continuamente no alvo, o intervalo entre comandos <code>TRIGGER</code> é aleatório entre 6 e 8 s. Sair do alvo cancela apenas a verificação de estabilidade em andamento; não encurta uma pausa já iniciada após disparo.</td>
       </tr>
       <tr>
+        <td>24/09/2026</td>
+        <td><code>firmware/esp32_trigger_controller/platformio.ini</code>, <code>firmware/esp32_trigger_controller/src/main.cpp</code></td>
+        <td>Alterada a saída D13 para repouso alto e pulso ativo baixo de 2 s: <code>TRIGGER_ACTIVE_HIGH=0</code> e <code>PULSE_WIDTH_US=2000000</code>.</td>
+        <td>No teste com LED, ele permanece aceso em repouso e apaga por 2 s ao receber <code>TRIGGER</code>. O firmware usa <code>delay()</code> para a parte em milissegundos da espera, evitando uma espera ocupada de 2 milhões de microssegundos.</td>
+      </tr>
+      <tr>
         <td>18/09/2026</td>
         <td><code>invesalius/constants.py</code></td>
         <td>Adicionada a constante <code>AUTOMATIC_TRIGGER_STABILITY_SECONDS = 2.0</code>.</td>
@@ -241,8 +247,8 @@
   <ul>
     <li><code>ENABLE_BNC_OUTPUT=1</code>: o ramo que altera o GPIO está habilitado pela opção de compilação do <code>platformio.ini</code>.</li>
     <li><code>TRIGGER_PIN=13</code>: a saída é o pino rotulado <code>D13</code> na placa, correspondente ao GPIO13 no DevKit V1 comum.</li>
-    <li><code>TRIGGER_ACTIVE_HIGH=1</code>: o pulso vai do nível inativo baixo para o nível alto e volta a baixo.</li>
-    <li><code>PULSE_WIDTH_US=1000</code>: o nível alto permanece por 1000 microssegundos, ou 1 ms.</li>
+    <li><code>TRIGGER_ACTIVE_HIGH=0</code>: o D13 fica alto em repouso e vai ao nível baixo quando o comando é recebido.</li>
+    <li><code>PULSE_WIDTH_US=2000000</code>: o nível baixo permanece por 2.000.000 microssegundos, ou 2 s.</li>
     <li>O nível alto do GPIO é nominalmente 3,3 V; o firmware não cria uma fonte regulada de 3,6 V ou 5,5 V.</li>
   </ul>
 
@@ -253,7 +259,7 @@
     <tbody>
       <tr><td><code>PING</code></td><td>Teste de comunicação.</td><td><code>PONG</code></td></tr>
       <tr><td><code>STATUS</code></td><td>Consulta o modo de saída compilado.</td><td><code>OUTPUT_ENABLED</code></td></tr>
-      <tr><td><code>TRIGGER</code></td><td>D13 alto por 1 ms e, em seguida, baixo.</td><td><code>PULSE</code></td></tr>
+      <tr><td><code>TRIGGER</code></td><td>D13 baixo por 2 s e, em seguida, alto.</td><td><code>PULSE</code></td></tr>
       <tr><td>Outro comando não vazio</td><td>Nenhum pulso é produzido.</td><td><code>UNKNOWN_COMMAND</code></td></tr>
     </tbody>
   </table>

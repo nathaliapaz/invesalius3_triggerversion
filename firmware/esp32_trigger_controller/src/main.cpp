@@ -16,7 +16,7 @@
 #endif
 
 #ifndef PULSE_WIDTH_US
-#define PULSE_WIDTH_US 1000
+#define PULSE_WIDTH_US 2000000
 #endif
 
 namespace {
@@ -33,6 +33,19 @@ int inactive_level() {
   return TRIGGER_ACTIVE_HIGH ? LOW : HIGH;
 }
 
+void wait_for_pulse_width() {
+  // delay() yields to the ESP32 runtime while a multi-second level is held.
+  // Keep the remainder in microseconds so shorter widths remain possible.
+  const unsigned long milliseconds = PULSE_WIDTH_US / 1000UL;
+  const unsigned int microseconds = PULSE_WIDTH_US % 1000UL;
+  if (milliseconds > 0) {
+    delay(milliseconds);
+  }
+  if (microseconds > 0) {
+    delayMicroseconds(microseconds);
+  }
+}
+
 void emit_trigger() {
 #if ENABLE_BNC_OUTPUT
   if (TRIGGER_PIN < 0) {
@@ -41,7 +54,7 @@ void emit_trigger() {
   }
 
   digitalWrite(TRIGGER_PIN, active_level());
-  delayMicroseconds(PULSE_WIDTH_US);
+  wait_for_pulse_width();
   digitalWrite(TRIGGER_PIN, inactive_level());
 
   // InVesalius treats only this exact line as a confirmed pulse event.
