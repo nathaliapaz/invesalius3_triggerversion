@@ -32,6 +32,7 @@ import invesalius.data.coregistration as dcr
 import invesalius.data.e_field as e_field
 import invesalius.data.polydata_utils as pu
 import invesalius.data.serial_port_connection as spc
+import invesalius.data.tcp_trigger_connection as ttc
 import invesalius.data.slice_ as sl
 import invesalius.data.tractography as dti
 import invesalius.data.transformations as tr
@@ -404,6 +405,8 @@ class Navigation(metaclass=Singleton):
         self.com_port = None
         self.baud_rate = None
         self.serial_port_connection = None
+        self.wifi_trigger_in_use = False
+        self.wifi_trigger_connection = None
 
         # During navigation
         self.lock_to_target = False
@@ -422,6 +425,7 @@ class Navigation(metaclass=Singleton):
         Publisher.subscribe(self.SetNoOfCoils, "Reset coil selection")
         Publisher.subscribe(self.SelectCoil, "Select coil")
         Publisher.subscribe(self.UpdateSerialPort, "Update serial port")
+        Publisher.subscribe(self.UpdateWifiTrigger, "Update Wi-Fi trigger")
         Publisher.subscribe(self.SetAutomaticTriggerEnabled, "Set automatic trigger")
         Publisher.subscribe(self.TrackObject, "Track object")
 
@@ -571,13 +575,15 @@ class Navigation(metaclass=Singleton):
         if not self.automatic_trigger_enabled or not self.coil_at_target:
             return
 
-        if not self.serial_port_in_use or self.serial_port_connection is None:
+        connection, transport_name = self._get_trigger_connection()
+        if connection is None:
             Publisher.sendMessage(
-                "Automatic trigger status", status=_("Automatic trigger: serial port is not connected")
+                "Automatic trigger status",
+                status=_(f"Automatic trigger: {transport_name} is not connected"),
             )
             return
 
-        if not self.serial_port_connection.SendPulse():
+        if not connection.SendPulse():
             Publisher.sendMessage(
                 "Automatic trigger status", status=_("Automatic trigger: command could not be sent")
             )
@@ -646,8 +652,27 @@ class Navigation(metaclass=Singleton):
         self.serial_port_in_use = serial_port_in_use
         self.com_port = com_port
         self.baud_rate = baud_rate
+        if serial_port_in_use:
+            # Use only one trigger transport per navigation session.
+            self.wifi_trigger_in_use = False
+            Publisher.sendMessage("Wi-Fi trigger enabled", enabled=False)
         if not serial_port_in_use:
             self.SetAutomaticTriggerEnabled(False)
+
+    def UpdateWifiTrigger(self, enabled=False):
+        self.wifi_trigger_in_use = bool(enabled)
+        if self.wifi_trigger_in_use:
+            # Use only one trigger transport per navigation session.
+            self.serial_port_in_use = False
+        else:
+            self.SetAutomaticTriggerEnabled(False)
+
+    def _get_trigger_connection(self):
+        if self.wifi_trigger_in_use:
+            return self.wifi_trigger_connection, "Wi-Fi trigger"
+        if self.serial_port_in_use:
+            return self.serial_port_connection, "serial port"
+        return None, "trigger transport"
 
     def TrackObject(self, enabled=False):
         self.track_coil = enabled
@@ -694,7 +719,8 @@ class Navigation(metaclass=Singleton):
         return fre, fre <= const.FIDUCIAL_REGISTRATION_ERROR_THRESHOLD
 
     def PedalStateChanged(self, state):
-        if not self.serial_port_in_use:
+        connection, _ = self._get_trigger_connection()
+        if connection is None:
             return
 
         permission_to_stimulate = (
@@ -702,7 +728,7 @@ class Navigation(metaclass=Singleton):
         ) or not self.lock_to_target
 
         if state and permission_to_stimulate:
-            self.serial_port_connection.SendPulse()
+            connection.SendPulse()
 
     def EstimateTrackerToInVTransformationMatrix(self, tracker, image):
         tracker_fiducials, tracker_fiducials_raw = tracker.GetTrackerFiducials()
@@ -756,7 +782,7 @@ class Navigation(metaclass=Singleton):
             self.event.clear()
 
         vis_components = [
-            self.serial_port_in_use,
+            self.serial_port_in_use or self.wifi_trigger_in_use,
             self.view_tracts,
             self.peel_loaded,
             self.e_field_loaded,
@@ -860,6 +886,23 @@ class Navigation(metaclass=Singleton):
                     self.serial_port_in_use = False
                     self.SetAutomaticTriggerEnabled(False)
 
+            if self.wifi_trigger_in_use:
+                self.wifi_trigger_connection = ttc.ESP32TCPTriggerConnection(
+                    host=const.ESP32_WIFI_TRIGGER_HOST,
+                    port=const.ESP32_WIFI_TRIGGER_PORT,
+                    timeout_seconds=const.ESP32_WIFI_TRIGGER_TIMEOUT_SECONDS,
+                )
+                if not self.wifi_trigger_connection.Connect():
+                    wx.MessageBox(
+                        "Failed to connect to the ESP32 Wi-Fi trigger. "
+                        "Confirm that this computer is connected to the ESP32 Wi-Fi network.",
+                        "InVesalius 3",
+                    )
+                    self.wifi_trigger_in_use = False
+                    self.wifi_trigger_connection = None
+                    Publisher.sendMessage("Wi-Fi trigger enabled", enabled=False)
+                    self.SetAutomaticTriggerEnabled(False)
+
             if self.view_tracts:
                 # initialize Trekker parameters
                 slic = sl.Slice()
@@ -933,7 +976,11 @@ class Navigation(metaclass=Singleton):
         if self.serial_port_connection is not None:
             self.serial_port_connection.join()
 
-        if self.serial_port_in_use:
+        if self.wifi_trigger_connection is not None:
+            self.wifi_trigger_connection.Disconnect()
+            self.wifi_trigger_connection = None
+
+        if self.serial_port_in_use or self.wifi_trigger_in_use:
             self.serial_port_queue.clear()
             self.serial_port_queue.join()
 

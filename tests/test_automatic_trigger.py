@@ -13,6 +13,8 @@ def make_navigation():
     navigation._automatic_trigger_fired = False
     navigation.serial_port_in_use = True
     navigation.serial_port_connection = MagicMock()
+    navigation.wifi_trigger_in_use = False
+    navigation.wifi_trigger_connection = None
     return navigation
 
 

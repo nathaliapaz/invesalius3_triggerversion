@@ -26,11 +26,11 @@
 </head>
 <body>
   <h1>Caderno de modificações</h1>
-  <p>Registro mantido para a branch <code>test-trigger</code>.</p>
+  <p>Registro iniciado na branch <code>test-trigger</code> e continuado na branch local <code>tcp-magstim-bridge</code>.</p>
 
   <section class="meta" aria-label="Metadados do caderno">
-    <strong>Atualizado em:</strong> 24/09/2026<br>
-    <strong>Objetivo atual:</strong> adicionar um trigger automático de TMS quando a bobina permanecer no alvo por 2 segundos, com controle e indicação visual na navegação, e preparar a futura comunicação serial remota com o Magstim.
+    <strong>Atualizado em:</strong> 06/10/2026<br>
+    <strong>Objetivo atual:</strong> testar localmente a comunicação TCP mínima entre computador e ESP32 por Wi-Fi, como preparação para a futura comunicação serial remota com o Magstim.
   </section>
 
   <h2>Como atualizar</h2>
@@ -51,6 +51,24 @@
       </tr>
     </thead>
     <tbody>
+      <tr>
+        <td>06/10/2026</td>
+        <td><code>firmware/esp32_magstim_bridge/</code>, <code>invesalius/data/tcp_trigger_connection.py</code>, <code>invesalius/navigation/navigation.py</code>, <code>invesalius/gui/task_navigator.py</code></td>
+        <td>Adicionado teste de trigger Wi-Fi ponta a ponta: InVesalius conecta por TCP ao ESP32 em <code>192.168.4.1:7000</code>, envia <code>TRIGGER</code>; o ESP32 aplica no D13 o mesmo pulso ativo-baixo de 2 s do teste anterior e devolve <code>PULSE</code>.</td>
+        <td>O novo botão <code>WIFI</code> é separado do botão de porta COM e deve ser habilitado antes de iniciar a navegação. Esta etapa continua limitada ao LED; não configura UART, MAX3232, DB26 ou Magstim.</td>
+      </tr>
+      <tr>
+        <td>06/10/2026</td>
+        <td><code>firmware/esp32_magstim_bridge/</code></td>
+        <td>Simplificado o teste de rede para somente <code>PING</code>/<code>PONG</code>. Removidos heartbeat, status, comandos adicionais e o cliente Python auxiliar.</td>
+        <td>Ao abrir uma conexão TCP, o ESP envia <code>READY</code>. Ao receber uma linha <code>PING</code>, responde <code>PONG</code>. Não há nenhuma comunicação com Magstim nesta etapa.</td>
+      </tr>
+      <tr>
+        <td>02/10/2026</td>
+        <td><code>firmware/esp32_magstim_bridge/</code></td>
+        <td>Criado projeto PlatformIO separado para o teste de rede. O ESP32 cria uma rede Wi-Fi própria e aceita um único cliente TCP na porta 7000.</td>
+        <td>O escopo inicial era um protocolo de teste mais amplo; em 06/10/2026 ele foi reduzido para somente <code>PING</code>/<code>PONG</code>. Não há UART, MAX3232, DB26, BNC, comando Magstim ou integração com InVesalius nesta etapa.</td>
+      </tr>
       <tr>
         <td>24/09/2026</td>
         <td>Planejamento de hardware e protocolo (sem alteração de código)</td>

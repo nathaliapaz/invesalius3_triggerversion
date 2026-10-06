@@ -2319,6 +2319,22 @@ class ControlPanel(wx.Panel):
         )
         self.automatic_trigger_button = automatic_trigger_button
 
+        # Wi-Fi trigger test control. It remains separate from the established
+        # COM-port button so the serial workflow is still available.
+        wifi_trigger_button = wx.ToggleButton(
+            scroll_panel, -1, "WIFI", style=pbtn.PB_STYLE_SQUARE, size=ICON_SIZE
+        )
+        wifi_trigger_button.SetBackgroundColour(RED_COLOR)
+        wifi_trigger_button.SetValue(False)
+        wifi_trigger_button.SetToolTip(
+            _("Connect automatic trigger to ESP32 through local Wi-Fi")
+        )
+        wifi_trigger_button.Bind(
+            wx.EVT_TOGGLEBUTTON,
+            partial(self.OnEnableWifiTrigger, ctrl=wifi_trigger_button),
+        )
+        self.wifi_trigger_button = wifi_trigger_button
+
         # Toggle Button to use serial port to trigger pulse signal and create markers
         tooltip = _("Enable serial port communication to trigger pulse and create markers")
         BMP_PORT = wx.Bitmap(str(inv_paths.ICON_DIR.joinpath("wave.png")), wx.BITMAP_TYPE_PNG)
@@ -2408,6 +2424,7 @@ class ControlPanel(wx.Panel):
                 (show_coil_button),
                 (show_probe_button),
                 (automatic_trigger_button),
+                (wifi_trigger_button),
                 (show_motor_map_button),
             ]
         )
@@ -2455,6 +2472,7 @@ class ControlPanel(wx.Panel):
         Publisher.subscribe(self.UpdateNavigationStatus, "Navigation status")
         Publisher.subscribe(self.OnAutomaticTriggerStatus, "Automatic trigger status")
         Publisher.subscribe(self.OnAutomaticTriggerEnabled, "Automatic trigger enabled")
+        Publisher.subscribe(self.OnWifiTriggerEnabled, "Wi-Fi trigger enabled")
 
         Publisher.subscribe(self.OnRobotAdded, "Robot added")
 
@@ -2600,9 +2618,13 @@ class ControlPanel(wx.Panel):
         if nav_status:
             self.UpdateToggleButton(self.checkbox_serial_port)
             self.EnableToggleButton(self.checkbox_serial_port, 0)
+            self.UpdateToggleButton(self.wifi_trigger_button)
+            self.EnableToggleButton(self.wifi_trigger_button, 0)
         else:
             self.EnableToggleButton(self.checkbox_serial_port, 1)
             self.UpdateToggleButton(self.checkbox_serial_port)
+            self.EnableToggleButton(self.wifi_trigger_button, 1)
+            self.UpdateToggleButton(self.wifi_trigger_button)
 
     def OnCoilSelectionDone(self, done):
         self.PressTrackObjectButton(done)
@@ -2757,6 +2779,13 @@ class ControlPanel(wx.Panel):
             )
         else:
             Publisher.sendMessage("Update serial port", serial_port_in_use=False)
+
+    def OnEnableWifiTrigger(self, evt, ctrl):
+        self.UpdateToggleButton(ctrl)
+        Publisher.sendMessage("Update Wi-Fi trigger", enabled=ctrl.GetValue())
+
+    def OnWifiTriggerEnabled(self, enabled):
+        self.UpdateToggleButton(self.wifi_trigger_button, enabled)
 
     # 'E Field'
     def OnEfieldCheckbox(self, evt, ctrl):

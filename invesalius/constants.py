@@ -1196,6 +1196,11 @@ BAUD_RATE_DEFAULT_SELECTION = 4
 # firmware must generate one isolated BNC pulse for each complete command.
 ESP32_TRIGGER_COMMAND = b"TRIGGER\n"
 
+# Local Wi-Fi access point created by firmware/esp32_magstim_bridge.
+ESP32_WIFI_TRIGGER_HOST = "192.168.4.1"
+ESP32_WIFI_TRIGGER_PORT = 7000
+ESP32_WIFI_TRIGGER_TIMEOUT_SECONDS = 4.0
+
 # Automatic TMS triggering is deliberately opt-in.  The coil has to remain at
 # the target for this amount of time before an automatic trigger may be sent.
 AUTOMATIC_TRIGGER_STABILITY_SECONDS = 2.0
